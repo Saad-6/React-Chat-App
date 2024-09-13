@@ -2,13 +2,82 @@ import { useState } from 'react'
 import { Eye, EyeOff, Mail, Lock, Github, Twitter } from 'lucide-react'
 import { Input } from '../Components/UI/input'
 import { Button } from '../Components/UI/button'
+import { Link, useNavigate } from 'react-router-dom'
+import { LoginModel } from '../Interfaces/LoginModel'
+import { APIResponse } from '../Interfaces/APIResponse'
+import { SuccessToast } from '../Components/UI/SuccessToast'
+import { FailureToast } from '../Components/UI/FailiureToast'
+import { Loader } from '../Components/UI/Loader'
+import { LoginResponseModel } from '../Interfaces/LoginResponseModel'
 
 
 export default function LoginPage() {
-  const [showPassword, setShowPassword] = useState(false)
-
-  const togglePasswordVisibility = () => setShowPassword(!showPassword)
-
+  const [showPassword, setShowPassword] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [buttonText, setButtonText] = useState("Sign in");
+  const [showErrorToast, setShowErrorToast] = useState(false);
+  const togglePasswordVisibility = () => setShowPassword(!showPassword);
+  const [formData, setFormData] = useState<LoginModel>({
+    Email: '',
+    Password: '',
+});
+  const navigate = useNavigate();
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: value,
+    });
+  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    console.log('Setting loading to true');
+    setIsLoading(true);
+    
+    try {
+      const res = await fetch('https://localhost:7032/Login', { 
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+      });
+      
+      const result: APIResponse = await res.json();
+      setIsLoading(false);
+      console.log(result);
+      if (result.success) {
+        const loginResponse: LoginResponseModel = result.result;
+        console.log(loginResponse);
+        setToastMessage(result.message);
+        setShowSuccessToast(true);
+        setButtonText("You are now being redirected to the home page");
+        
+        setTimeout(() => {
+          setShowSuccessToast(false);
+          navigate("/");
+        }, 1000);
+        setIsLoading(false);
+      } else {
+        console.log("Server sent a bad request")
+        setToastMessage(result.message);
+        setShowErrorToast(true);
+        setTimeout(() => setShowErrorToast(false), 6000);
+        setIsLoading(false);
+      }
+      
+    } catch (error) {
+      setToastMessage('Error during sign in ' + error);
+      setShowErrorToast(true);
+      setTimeout(() => setShowErrorToast(false), 6000);
+      setIsLoading(false);
+    } 
+  };
+  
+  
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -17,7 +86,7 @@ export default function LoginPage() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          <form className="space-y-6" action="#" method="POST">
+          <form className="space-y-6" onSubmit={handleSubmit} method="POST">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
@@ -34,6 +103,7 @@ export default function LoginPage() {
                   required
                   className="pl-10 block w-full"
                   placeholder="you@example.com"
+                  onChange={handleInputChange}
                 />
               </div>
             </div>
@@ -54,6 +124,7 @@ export default function LoginPage() {
                   required
                   className="pl-10 pr-10 block w-full"
                   placeholder="••••••••"
+                  onChange={handleInputChange}
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
                   <button
@@ -93,7 +164,8 @@ export default function LoginPage() {
 
             <div>
               <Button type="submit" className="w-full flex justify-center py-2 px-4">
-                Sign in
+              {buttonText}
+              {isLoading && <Loader></Loader>}
               </Button>
             </div>
           </form>
@@ -128,9 +200,19 @@ export default function LoginPage() {
                 </Button>
               </div>
             </div>
+            <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Dont have an account?{' '}
+              <Link to="/signup" className="font-medium text-primary hover:text-primary-dark">
+                Sign up
+              </Link>
+            </p>
+          </div>
           </div>
         </div>
       </div>
+      {showSuccessToast && <SuccessToast message={toastMessage} />}
+      {showErrorToast && <FailureToast message={toastMessage} />}
     </div>
   )
 }
