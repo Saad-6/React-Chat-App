@@ -16,11 +16,6 @@ interface Contact {
 }
 
 export default function HomePage() {
-  const [contacts] = useState<Contact[]>([
-    { id: 1, name: "Alice Smith", avatar: "/placeholder.svg?height=32&width=32", status: 'online', lastMessage: "Hey, how's it going?" },
-    { id: 2, name: "Bob Johnson", avatar: "/placeholder.svg?height=32&width=32", status: 'offline', lastMessage: "See you tomorrow!" },
-    { id: 3, name: "Carol Williams", avatar: "/placeholder.svg?height=32&width=32", status: 'online', lastMessage: "Thanks for your help!" },
-  ]);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
