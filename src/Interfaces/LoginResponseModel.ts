@@ -1,4 +1,4 @@
 export interface LoginResponseModel {
-    Email : string,
-    JWT : string
+    email : string,
+    jwt : string
 }

@@ -52,6 +52,7 @@ export default function LoginPage() {
       if (result.success) {
         const loginResponse: LoginResponseModel = result.result;
         console.log(loginResponse);
+        localStorage.setItem('jwtToken', loginResponse.jwt);
         setToastMessage(result.message);
         setShowSuccessToast(true);
         setButtonText("You are now being redirected to the home page");
