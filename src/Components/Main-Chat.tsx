@@ -11,11 +11,35 @@ interface MainChatAreaProps {
 
 export function MainChatArea({ selectedChat, currentUser }: MainChatAreaProps) {
   const [localMessages, setLocalMessages] = useState<MessageModel[]>([])
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+
+  useEffect(() => {
+    if (currentUser) {
+      const newSocket = new WebSocket(`wss://localhost:7032/ws?userId=${currentUser.id}`);
+      setSocket(newSocket);
+
+      newSocket.onmessage = (event) => {
+        const messageData = JSON.parse(event.data);
+        console.log("Message received from websocket: ", messageData);
+        if (messageData.senderId !== currentUser.id) {
+          setLocalMessages((prev) => [...prev, messageData]);
+        }
+      };
+
+      return () => {
+        if (newSocket.readyState === WebSocket.OPEN) {
+          newSocket.close();
+        }
+      };
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     if (selectedChat) {
       console.log("Selected chat updated:", selectedChat)
       setLocalMessages(selectedChat.messages || [])
+    } else {
+      setLocalMessages([])
     }
   }, [selectedChat])
 
@@ -46,7 +70,7 @@ export function MainChatArea({ selectedChat, currentUser }: MainChatAreaProps) {
 
       if (result.success) {
         const newMessage: MessageModel = {
-          id: result.result.messageId,
+          id: result.result.id,
           content: content,
           senderUserId: currentUser.id,
           receiverUserId: otherUser.id,

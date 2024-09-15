@@ -1,5 +1,4 @@
 import React from 'react';
-import logo from './logo.svg';
 import './App.css';
 import HomePage from './Pages/HomePage';
 import { BrowserRouter, Route, Router, Routes } from 'react-router-dom';
@@ -13,6 +12,7 @@ function App() {
       <Routes>
         {/* Default route */}
         <Route path="/" element={<HomePage />} />
+        <Route path="/chat/:chatId" element={<HomePage />} />
         {/* Login route */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignUpPage />} />

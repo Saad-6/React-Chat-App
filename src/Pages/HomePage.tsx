@@ -5,7 +5,7 @@ import { Button } from '../Components/UI/button'
 import { MainChatArea } from '../Components/Main-Chat'
 import { ContactsList } from '../Components/Contact-List'
 import { jwtDecode } from 'jwt-decode'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { ContactModel } from '../Interfaces/ContactModel'
 import { ApiResponse, ChatResponseModel, UserModel } from '../Interfaces/Collective-Interfaces'
 
@@ -22,6 +22,7 @@ export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<UserModel | null>(null)
 
   const navigate = useNavigate()
+  const { chatId } = useParams<{ chatId: string }>()
 
   useEffect(() => {
     const token = localStorage.getItem('jwtToken')
@@ -43,6 +44,15 @@ export default function HomePage() {
   useEffect(() => {
     console.log("Current user updated:", currentUser)
   }, [currentUser])
+
+  useEffect(() => {
+    if (currentUser && allContacts.length > 0 && chatId) {
+      const contact = allContacts.find(c => c.contactId === chatId)
+      if (contact) {
+        handleChatSelect(contact)
+      }
+    }
+  }, [currentUser, allContacts, chatId])
 
   const fetchUserData = async (userId: string) => {
     try {
@@ -84,6 +94,7 @@ export default function HomePage() {
       if (result.success) {
         console.log("Chat messages fetched:", result.result)
         setSelectedChat(result.result)
+        navigate(`/chat/${contact.contactId}`, { replace: true })
       } else {
         console.log("Failed to fetch chat messages:", result.message)
       }
@@ -107,6 +118,7 @@ export default function HomePage() {
 
       <div className="flex flex-1 overflow-hidden">
         <div className={`${isSidebarOpen ? 'block' : 'hidden'} md:block`}>
+          
           <ContactsList contacts={allContacts} onSelectChat={handleChatSelect} />
         </div>
 
