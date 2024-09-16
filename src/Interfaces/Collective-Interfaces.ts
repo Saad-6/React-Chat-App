@@ -23,8 +23,8 @@ export interface SendMessageResponse {
     content: string;
     senderUserId: string;
     receiverUserId: string;
-    sentTime: string;
-    readTime: string;
+    sentTime: Date;
+    readTime: Date;
     readStatus: boolean;
   }
   

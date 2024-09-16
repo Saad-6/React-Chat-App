@@ -15,7 +15,8 @@ export function ContactsList({ contacts, onSelectChat }: ContactsListProps) {
       </div>
       <div className="overflow-y-auto h-[calc(100vh-8rem)]">
         {contacts.map((contact) => (
-          <ContactItem key={contact.id} contact={contact} onSelect={() => onSelectChat(contact)} />
+          <ContactItem key={contact.contactId} contact={contact} onSelect={() => onSelectChat(contact)} />
+
         ))}
       </div>
     </div>

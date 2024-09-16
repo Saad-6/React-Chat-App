@@ -7,32 +7,11 @@ import { ChatResponseModel, MessageModel, UserModel } from '../Interfaces/Collec
 interface MainChatAreaProps {
   selectedChat: ChatResponseModel | null
   currentUser: UserModel | null
+  onSendMessage: (message: MessageModel) => void
 }
 
-export function MainChatArea({ selectedChat, currentUser }: MainChatAreaProps) {
+export function MainChatArea({ selectedChat, currentUser, onSendMessage }: MainChatAreaProps) {
   const [localMessages, setLocalMessages] = useState<MessageModel[]>([])
-  const [socket, setSocket] = useState<WebSocket | null>(null);
-
-  useEffect(() => {
-    if (currentUser) {
-      const newSocket = new WebSocket(`wss://localhost:7032/ws?userId=${currentUser.id}`);
-      setSocket(newSocket);
-
-      newSocket.onmessage = (event) => {
-        const messageData = JSON.parse(event.data);
-        console.log("Message received from websocket: ", messageData);
-        if (messageData.senderId !== currentUser.id) {
-          setLocalMessages((prev) => [...prev, messageData]);
-        }
-      };
-
-      return () => {
-        if (newSocket.readyState === WebSocket.OPEN) {
-          newSocket.close();
-        }
-      };
-    }
-  }, [currentUser]);
 
   useEffect(() => {
     if (selectedChat) {
@@ -75,11 +54,12 @@ export function MainChatArea({ selectedChat, currentUser }: MainChatAreaProps) {
           senderUserId: currentUser.id,
           receiverUserId: otherUser.id,
           sentTime: result.result.sentTime,
-          readTime: new Date().toISOString(),
+          readTime: result.result.readTime,
           readStatus: false
         }
 
         setLocalMessages(prev => [...prev, newMessage])
+        onSendMessage(newMessage)
       } else {
         console.error('Failed to send message:', result.message)
       }
