@@ -64,8 +64,9 @@ export function AddContactModal({ isOpen, onClose }: AddContactModalProps) {
     const result: APIResponse = await res.json();
   
     if (result.success) {
-      console.log("User retrieved", result.result);
+      console.log("Result is success ");
       if (result.result) {
+        console.log("Result.Result exists")
         setSearchResult(result.result);
         setNoUserFound(false);
       } else {

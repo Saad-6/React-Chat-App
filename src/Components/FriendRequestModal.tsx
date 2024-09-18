@@ -47,9 +47,7 @@ export function FriendRequestsModal({ isOpen, onClose, currentUser ,reRender }: 
         throw new Error('Failed to fetch friend requests')
       }
       const data = await response.json()
-      console.log("Server sent ", data)
       setFriendRequests(data.result)
-      console.log("Friend Requests ", friendRequests)
     } catch (err) {
       setError('Failed to load friend requests. Please try again.')
       console.error('Error fetching friend requests:', err)

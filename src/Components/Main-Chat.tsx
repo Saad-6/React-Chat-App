@@ -15,11 +15,13 @@ export function MainChatArea({ selectedChat, currentUser, onSendMessage }: MainC
   const [otherUserOnlineStatus,setOtherUserOnlineStatus] = useState(false);
 
   useEffect(() => {
-    if (selectedChat) {
+    if (selectedChat) { 
+
       setLocalMessages(selectedChat.messages || [])
       setOtherUserOnlineStatus(false);
       const otherUser = selectedChat.participants.find(m=>m.id != currentUser?.id);
       if(otherUser){
+
         getOnlineStatus(otherUser.id)
       }
     } else {
@@ -39,7 +41,6 @@ export function MainChatArea({ selectedChat, currentUser, onSendMessage }: MainC
       })
       const result = await res.json()
       if(result.result){
-        console.log("User online status ",result);
         setOtherUserOnlineStatus(result.result);
       }
     }

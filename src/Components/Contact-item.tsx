@@ -1,26 +1,47 @@
-import { Avatar, AvatarFallback, AvatarImage } from "./UI/avatar"
+import React from 'react'
+import { Avatar, AvatarFallback, AvatarImage } from './UI/avatar'
 import { ContactModel } from '../Interfaces/ContactModel'
 
 interface ContactItemProps {
   contact: ContactModel
-  onSelect: () => void
+  onSelect: (contact: ContactModel) => void
 }
 
-export function ContactItem({ contact, onSelect }: ContactItemProps) {
+export const ContactItem: React.FC<ContactItemProps> = ({ contact, onSelect }) => {
+  const handleClick = () => {
+    onSelect(contact)
+  }
+
+  // Safely get the first character of the contact name, or use a fallback
+  const getAvatarFallback = () => {
+    if (contact.contactName && typeof contact.contactName === 'string') {
+      return contact.contactName.charAt(0).toUpperCase()
+    }
+    return '?'
+  }
+
   return (
-    <div className="flex items-center p-3 hover:bg-gray-100 cursor-pointer" onClick={onSelect}>
-      <Avatar className="h-10 w-10">
-        <AvatarImage src={contact.contactPicture || "/placeholder.svg?height=40&width=40"} alt={contact.contactName} />
-        <AvatarFallback>{contact.contactName.charAt(0)}</AvatarFallback>
+    <div
+      className="flex items-center space-x-4 p-3 hover:bg-gray-100 cursor-pointer"
+      onClick={handleClick}
+    >
+      <Avatar>
+        <AvatarImage src={contact.contactPicture || "/placeholder.svg?height=40&width=40"} alt={contact.contactName || "Contact"} />
+        <AvatarFallback>{getAvatarFallback()}</AvatarFallback>
       </Avatar>
-      <div className="ml-3 flex-1 overflow-hidden">
-        <div className="flex justify-between items-baseline">
-          <h2 className="text-sm font-semibold text-gray-800 truncate">{contact.contactName}</h2>
-          <span className="text-xs text-gray-500">{/*contact.lastMessage.sentTime*/}</span>
-        </div>
-        <p className="text-sm text-gray-600 truncate">{contact.lastMessage.content}</p>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-gray-900 truncate">
+          {contact.contactName || "Unknown Contact"}
+        </p>
+        <p className="text-sm text-gray-500 truncate">
+          {contact.lastMessage?.content || "No messages yet"}
+        </p>
       </div>
-      <div className={`w-2 h-2 rounded-full ${contact.contactEmail === 'online' ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+      {contact.lastMessageTime && (
+        <span className="text-xs text-gray-400">
+          {new Date(contact.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </span>
+      )}
     </div>
   )
 }

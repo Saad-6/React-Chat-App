@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Menu, UserPlus } from 'lucide-react'
 import { ContactsList } from '../Components/Contact-List'
 import { jwtDecode } from 'jwt-decode'
@@ -9,7 +9,6 @@ import { FriendRequestsModal } from '../Components/FriendRequestModal'
 import { Button } from '../Components/UI/button'
 import { Avatar, AvatarFallback, AvatarImage } from '../Components/UI/avatar'
 import { MainChatArea } from '../Components/Main-Chat'
-
 
 interface DecodedToken {
   id: string;
@@ -28,7 +27,6 @@ export default function HomePage() {
   const navigate = useNavigate()
   const { chatId } = useParams<{ chatId: string }>()
 
-
   useEffect(() => {
     const token = localStorage.getItem('jwtToken')
     if (!token) {
@@ -40,9 +38,8 @@ export default function HomePage() {
         name: decoded.fullName,
         isOnline: true,
         lastSeen: new Date().toISOString()
-      });
+      })
       fetchUserData(decoded.id)
-      initializeWebSocket(decoded.id)
     }
   }, [navigate])
 
@@ -55,32 +52,75 @@ export default function HomePage() {
     }
   }, [currentUser, allContacts, chatId])
 
-  const initializeWebSocket = (userId: string) => {
-    const newSocket = new WebSocket(`wss://localhost:7032/ws?userId=${userId}`);
-    console.log("Web socket connection establisehd");
-    setSocket(newSocket);
-   
-    newSocket.onmessage = (event) => {
-      const messageData: MessageModel = JSON.parse(event.data);
-      console.log("Message received from websocket: ", messageData);
-      if (messageData.senderUserId !== userId) {
-        updateChatAndContacts(messageData);
+  // Only initialize WebSocket once currentUser is set
+  useEffect(() => {
+    if (currentUser) {
+      const initializeWebSocket = (userId: string) => {
+        const newSocket = new WebSocket(`wss://localhost:7032/ws?userId=${userId}`)
+        console.log("Web socket connection established")
+        setSocket(newSocket)
+
+        newSocket.onmessage = (event) => {
+          const payload = JSON.parse(event.data)
+          console.log("Message received from websocket: ", payload)
+
+          // Only process the message if currentUser is available
+          if (!currentUser) {
+            console.log("currentUser is not set yet")
+            return
+          }
+
+          if (payload.type === "message") {
+            const messageData: MessageModel = payload.data
+            updateChatAndContacts(messageData)
+          } else if (payload.type === "thumbnaillist") {
+            console.log("In thumbnail list")
+            if (currentUser.id) {
+              console.log("user id exists, about to call fetchData")
+              fetchUserData(currentUser.id)
+            }
+          }
+        }
+
+        newSocket.onclose = () => {
+          console.log("WebSocket connection closed")
+          setTimeout(() => initializeWebSocket(userId), 5000)
+        }
+
+        return () => {
+          if (newSocket.readyState === WebSocket.OPEN) {
+            newSocket.close()
+          }
+        }
       }
-    };
 
-    newSocket.onclose = () => {
-      console.log("WebSocket connection closed");
-      // Attempt to reconnect after a delay
-      setTimeout(() => initializeWebSocket(userId), 5000);
-    };
+      // Initialize WebSocket with the current user ID
+      initializeWebSocket(currentUser.id)
+    }
+  }, [currentUser])
 
-    return () => {
-      if (newSocket.readyState === WebSocket.OPEN) {
-        newSocket.close();
-      }
-    };
+  const updateContacts = (newContactsData: ContactModel | ContactModel[]) => {
+    setAllContacts((prevContacts) => {
+      const updatedContacts = [...prevContacts]
+      const newContactsArray = Array.isArray(newContactsData) ? newContactsData : [newContactsData]
 
+      newContactsArray.forEach(newContact => {
+        const existingIndex = updatedContacts.findIndex(c => c.contactId === newContact.contactId)
+        if (existingIndex !== -1) {
+          updatedContacts[existingIndex] = {
+            ...updatedContacts[existingIndex],
+            ...newContact,
+            lastMessage: newContact.lastMessage || updatedContacts[existingIndex].lastMessage
+          }
+        } else {
+          updatedContacts.push(newContact)
+        }
+      })
 
+      return updatedContacts.sort((a, b) =>
+        new Date(b.lastMessage?.sentTime || 0).getTime() - new Date(a.lastMessage?.sentTime || 0).getTime()
+      )
+    })
   }
 
   const updateChatAndContacts = (newMessage: MessageModel) => {
@@ -89,32 +129,72 @@ export default function HomePage() {
         return {
           ...prevChat,
           messages: [...prevChat.messages, newMessage]
-        };
+        }
       }
-      return prevChat;
-    });
-  
+      return prevChat
+    })
+
     setAllContacts((prevContacts) => {
-      const updatedContacts = prevContacts.map((contact) => {
-        if (contact.contactId === newMessage.senderUserId) {
+      let updatedContacts = prevContacts.map((contact) => {
+        if (contact.contactId === newMessage.senderUserId || contact.contactId === newMessage.receiverUserId) {
           return {
             ...contact,
             lastMessage: newMessage,
             lastMessageTime: new Date(newMessage.sentTime),
-          };
+          }
         }
-        return contact;
-      });
-  
+        return contact
+      })
+
+      // Check if the sender is not in the contact list
+      const senderInContacts = updatedContacts.some(contact => contact.contactId === newMessage.senderUserId)
+      if (!senderInContacts && newMessage.senderUserId !== currentUser?.id) {
+        fetchUserInfo(newMessage.senderUserId).then(userInfo => {
+          if (userInfo) {
+            updateContacts({
+              contactId: userInfo.id,
+              contactName: userInfo.name,
+              contactEmail: "", // We don't have this in the simplified UserModel
+              contactPicture: "", // We don't have this in the simplified UserModel
+              lastMessage: newMessage,
+              lastMessageTime: new Date(newMessage.sentTime),
+              readTime: null,
+              status: userInfo.isOnline ? "online" : "offline"
+            })
+          }
+        })
+      }
+
       return updatedContacts.sort(
-        (a, b) => new Date(b.lastMessage.sentTime).getTime() - new Date(a.lastMessage.sentTime).getTime()
-      );
-    });
+        (a, b) => new Date(b.lastMessage?.sentTime || 0).getTime() - new Date(a.lastMessage?.sentTime || 0).getTime()
+      )
+    })
   }
-  
+
+  const fetchUserInfo = async (userId: string): Promise<UserModel | null> => {
+    try {
+      const response = await fetch('https://localhost:7032/GetUserInfo', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ Id: userId }),
+      })
+      const data = await response.json()
+      if (data.success) {
+        console.log("User info from server : ", data)
+        return data.result
+      }
+      return null
+    } catch (error) {
+      console.error('Error fetching user info:', error)
+      return null
+    }
+  }
 
   const fetchUserData = async (userId: string) => {
     try {
+      console.log("in fetch data with userId >", userId)
       const res = await fetch('https://localhost:7032/GetChatThumbnails', {
         method: 'POST',
         headers: {
@@ -124,8 +204,8 @@ export default function HomePage() {
       })
       const result: ApiResponse<ContactModel[]> = await res.json()
       if (result.success) {
-        setAllContacts(result.result.sort((a, b) => 
-          new Date(b.lastMessage.sentTime).getTime() - new Date(a.lastMessage.sentTime).getTime()
+        setAllContacts(result.result.sort((a, b) =>
+          new Date(b.lastMessage?.sentTime || 0).getTime() - new Date(a.lastMessage?.sentTime || 0).getTime()
         ))
       } else {
         console.log("Result not success:", result.message)
@@ -144,9 +224,9 @@ export default function HomePage() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          UserId: currentUser.id, 
-          OtherUserId: contact.contactId 
+        body: JSON.stringify({
+          UserId: currentUser.id,
+          OtherUserId: contact.contactId
         }),
       })
       const result: ApiResponse<ChatResponseModel> = await res.json()
@@ -163,13 +243,12 @@ export default function HomePage() {
 
   const handleSendMessage = async (message: MessageModel) => {
     if (selectedChat) {
-      updateChatAndContacts(message);
+      updateChatAndContacts(message)
       if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify(message));
+        socket.send(JSON.stringify(message))
       }
     }
   }
-
   return (
     <div className="flex flex-col h-screen bg-gray-100">
       <header className="bg-white border-b border-gray-200 p-4 flex justify-between items-center">
