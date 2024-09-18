@@ -11,21 +11,42 @@ interface MainChatAreaProps {
 }
 
 export function MainChatArea({ selectedChat, currentUser, onSendMessage }: MainChatAreaProps) {
-  const [localMessages, setLocalMessages] = useState<MessageModel[]>([])
+  const [localMessages, setLocalMessages] = useState<MessageModel[]>([]);
+  const [otherUserOnlineStatus,setOtherUserOnlineStatus] = useState(false);
 
   useEffect(() => {
     if (selectedChat) {
-      console.log("Selected chat updated:", selectedChat)
       setLocalMessages(selectedChat.messages || [])
+      setOtherUserOnlineStatus(false);
+      const otherUser = selectedChat.participants.find(m=>m.id != currentUser?.id);
+      if(otherUser){
+        getOnlineStatus(otherUser.id)
+      }
     } else {
       setLocalMessages([])
     }
   }, [selectedChat])
 
-  useEffect(() => {
-    console.log("Local messages updated:", localMessages)
-  }, [localMessages])
+  const getOnlineStatus = async (otherUserId : string) => {
 
+    try{
+      const res = await fetch('https://localhost:7032/GetOnlineStatus', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ Id: otherUserId }),
+      })
+      const result = await res.json()
+      if(result.result){
+        console.log("User online status ",result);
+        setOtherUserOnlineStatus(result.result);
+      }
+    }
+    catch(error){
+    console.log("Api request could not be made : ",error);
+    }
+  }
   const handleSendMessage = async (content: string) => {
     if (!currentUser || !selectedChat) return
 
@@ -82,7 +103,7 @@ export function MainChatArea({ selectedChat, currentUser, onSendMessage }: MainC
     <div className="flex-1 flex flex-col">
       <ChatHeader 
         name={otherUser?.name || 'Unknown'} 
-        status={otherUser?.isOnline ? 'Online' : 'Offline'} 
+        status={otherUserOnlineStatus ? 'Online' : 'Offline'} 
         avatar="/placeholder.svg?height=40&width=40" 
       />
       <ChatMessages messages={localMessages} currentUserId={currentUser.id} />

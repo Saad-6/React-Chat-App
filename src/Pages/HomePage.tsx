@@ -28,6 +28,7 @@ export default function HomePage() {
   const navigate = useNavigate()
   const { chatId } = useParams<{ chatId: string }>()
 
+
   useEffect(() => {
     const token = localStorage.getItem('jwtToken')
     if (!token) {
@@ -40,7 +41,6 @@ export default function HomePage() {
         isOnline: true,
         lastSeen: new Date().toISOString()
       });
-      console.log("Decoded token:", decoded)
       fetchUserData(decoded.id)
       initializeWebSocket(decoded.id)
     }
@@ -57,8 +57,9 @@ export default function HomePage() {
 
   const initializeWebSocket = (userId: string) => {
     const newSocket = new WebSocket(`wss://localhost:7032/ws?userId=${userId}`);
+    console.log("Web socket connection establisehd");
     setSocket(newSocket);
-
+   
     newSocket.onmessage = (event) => {
       const messageData: MessageModel = JSON.parse(event.data);
       console.log("Message received from websocket: ", messageData);
@@ -78,10 +79,11 @@ export default function HomePage() {
         newSocket.close();
       }
     };
+
+
   }
 
   const updateChatAndContacts = (newMessage: MessageModel) => {
-    // Update selected chat if it's the current chat
     setSelectedChat((prevChat) => {
       if (prevChat && (prevChat.participants[0].id === newMessage.senderUserId || prevChat.participants[1].id === newMessage.senderUserId)) {
         return {
@@ -92,7 +94,6 @@ export default function HomePage() {
       return prevChat;
     });
   
-    // Update contacts list
     setAllContacts((prevContacts) => {
       const updatedContacts = prevContacts.map((contact) => {
         if (contact.contactId === newMessage.senderUserId) {
@@ -126,7 +127,6 @@ export default function HomePage() {
         setAllContacts(result.result.sort((a, b) => 
           new Date(b.lastMessage.sentTime).getTime() - new Date(a.lastMessage.sentTime).getTime()
         ))
-        console.log("All contacts fetched:", result.result)
       } else {
         console.log("Result not success:", result.message)
       }
@@ -139,7 +139,6 @@ export default function HomePage() {
     if (!currentUser) return
 
     try {
-      console.log("Selecting chat with:", contact)
       const res = await fetch('https://localhost:7032/GetChatMessages', {
         method: 'POST',
         headers: {
@@ -152,7 +151,6 @@ export default function HomePage() {
       })
       const result: ApiResponse<ChatResponseModel> = await res.json()
       if (result.success) {
-        console.log("Chat messages fetched:", result.result)
         setSelectedChat(result.result)
         navigate(`/chat/${contact.contactId}`, { replace: true })
       } else {
