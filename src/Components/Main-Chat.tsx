@@ -106,6 +106,7 @@ export function MainChatArea({ selectedChat, currentUser, onSendMessage }: MainC
         name={otherUser?.name || 'Unknown'} 
         status={otherUserOnlineStatus ? 'Online' : 'Offline'} 
         avatar="/placeholder.svg?height=40&width=40" 
+        otherUserId={otherUser?.id}
       />
       <ChatMessages messages={localMessages} currentUserId={currentUser.id} />
       <ChatInput onSendMessage={handleSendMessage} />

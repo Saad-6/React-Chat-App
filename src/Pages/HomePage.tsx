@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Menu, UserPlus } from 'lucide-react'
+import { LogOut, Menu, UserPlus } from 'lucide-react'
 import { ContactsList } from '../Components/Contact-List'
 import { jwtDecode } from 'jwt-decode'
 import { useNavigate, useParams, Link } from 'react-router-dom'
@@ -23,7 +23,7 @@ export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<UserModel | null>(null)
   const [isFriendRequestsModalOpen, setIsFriendRequestsModalOpen] = useState(false)
   const [socket, setSocket] = useState<WebSocket | null>(null)
-
+  const [isLoading, setIsLoading] = useState(true)
   const navigate = useNavigate()
   const { chatId } = useParams<{ chatId: string }>()
 
@@ -51,7 +51,27 @@ export default function HomePage() {
       }
     }
   }, [currentUser, allContacts, chatId])
+  useEffect(() => {
+    const token = localStorage.getItem('jwtToken')
+    if (!token) {
+      navigate("/login")
+    } else {
+      const decoded = jwtDecode<DecodedToken>(token)
+      setCurrentUser({
+        id: decoded.id,
+        name: decoded.fullName,
+        isOnline: true,
+        lastSeen: new Date().toISOString()
+      })
+      fetchUserData(decoded.id)
+    }
+  }, [navigate])
 
+  useEffect(() => {
+    if (currentUser?.id) {
+      setIsLoading(false)
+    }
+  }, [currentUser])
   // Only initialize WebSocket once currentUser is set
   useEffect(() => {
     if (currentUser) {
@@ -93,8 +113,6 @@ export default function HomePage() {
           }
         }
       }
-
-      // Initialize WebSocket with the current user ID
       initializeWebSocket(currentUser.id)
     }
   }, [currentUser])
@@ -249,9 +267,20 @@ export default function HomePage() {
       }
     }
   }
+  const handleLogout = () => {
+    localStorage.removeItem('jwtToken')
+    navigate('/login')
+  }
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-gray-100">
+        <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    )
+  }
   return (
     <div className="flex flex-col h-screen bg-gray-100">
-      <header className="bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+     <header className="bg-white border-b border-gray-200 p-4 flex justify-between items-center">
         <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>
           <Menu className="h-6 w-6" />
         </Button>
@@ -270,6 +299,9 @@ export default function HomePage() {
               <AvatarFallback>{currentUser?.name.charAt(0) || 'U'}</AvatarFallback>
             </Avatar>
           </Link>
+          <Button variant="ghost" size="icon" onClick={handleLogout}>
+            <LogOut className="h-6 w-6" />
+          </Button>
         </div>
       </header>
 

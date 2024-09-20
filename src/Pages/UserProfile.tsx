@@ -21,7 +21,7 @@ interface DecodedToken {
 }
 
 export default function UserProfilePage() {
-    console.log("Entered profile page");
+    console.log("Entered profile");
   const [user, setUser] = useState<UserModel | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const navigate = useNavigate()
