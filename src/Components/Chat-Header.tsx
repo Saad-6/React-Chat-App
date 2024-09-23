@@ -1,19 +1,68 @@
-import React, { useState } from 'react'
+'use client'
+
+import React, { useEffect, useState } from 'react'
 import { Phone, Video, MoreVertical } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from './UI/avatar'
 import { Button } from './UI/button'
 import { CallModal } from './Call-Modal'
-
+import { ParticipantsModel } from '../Interfaces/Participants'
 
 interface ChatHeaderProps {
   name: string
   status: string
   avatar: string
-  otherUserId : string | undefined
+  participants: ParticipantsModel | undefined
+  currentUserId: string
+  callModalOpen: boolean
+  isCallRejected: boolean
 }
 
-export function ChatHeader({ name, status, avatar , otherUserId}: ChatHeaderProps) {
+export function ChatHeader({ 
+  name, 
+  status, 
+  avatar, 
+  participants, 
+  currentUserId, 
+  callModalOpen, 
+  isCallRejected 
+}: ChatHeaderProps) {
   const [isCallModalOpen, setIsCallModalOpen] = useState(false)
+
+  useEffect(() => {
+    setIsCallModalOpen(callModalOpen)
+  }, [callModalOpen])
+
+  const handleCallClick = async () => {
+    if (!participants) return
+
+    try {
+      const response = await fetch('https://localhost:7032/Ring', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          SenderUserId: currentUserId,
+          RecieverUserId: participants.RecieverUserId,
+        }),
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        setIsCallModalOpen(true)
+      } else {
+        console.error('Call failed:', result.message)
+        // Handle call failure (e.g., show an error message)
+      }
+    } catch (error) {
+      console.error('Error making call:', error)
+      // Handle error (e.g., show an error message)
+    }
+  }
+
+  const handleCloseCallModal = () => {
+    setIsCallModalOpen(false)
+  }
 
   return (
     <>
@@ -33,24 +82,29 @@ export function ChatHeader({ name, status, avatar , otherUserId}: ChatHeaderProp
             variant="ghost"
             size="icon"
             className="hidden md:inline-flex"
-            onClick={() => setIsCallModalOpen(true)}
+            onClick={handleCallClick}
           >
             <Phone className="h-5 w-5" />
+            <span className="sr-only">Call</span>
           </Button>
           <Button variant="ghost" size="icon" className="hidden md:inline-flex">
             <Video className="h-5 w-5" />
+            <span className="sr-only">Video call</span>
           </Button>
           <Button variant="ghost" size="icon">
             <MoreVertical className="h-5 w-5" />
+            <span className="sr-only">More options</span>
           </Button>
         </div>
       </div>
       <CallModal
         isOpen={isCallModalOpen}
-        onClose={() => setIsCallModalOpen(false)}
+        onClose={handleCloseCallModal}
         name={name}
         avatar={avatar}
-        status = {status}
+        status={status}
+        participants={participants}
+        isCallRejected={isCallRejected}
       />
     </>
   )

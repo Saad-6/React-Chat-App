@@ -9,6 +9,7 @@ import { FriendRequestsModal } from '../Components/FriendRequestModal'
 import { Button } from '../Components/UI/button'
 import { Avatar, AvatarFallback, AvatarImage } from '../Components/UI/avatar'
 import { MainChatArea } from '../Components/Main-Chat'
+import { IncomingCallModal } from '../Components/Incoming-call-modal'
 
 interface DecodedToken {
   id: string;
@@ -17,16 +18,20 @@ interface DecodedToken {
 }
 
 export default function HomePage() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [allContacts, setAllContacts] = useState<ContactModel[]>([])
-  const [selectedChat, setSelectedChat] = useState<ChatResponseModel | null>(null)
-  const [currentUser, setCurrentUser] = useState<UserModel | null>(null)
-  const [isFriendRequestsModalOpen, setIsFriendRequestsModalOpen] = useState(false)
-  const [socket, setSocket] = useState<WebSocket | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const navigate = useNavigate()
-  const { chatId } = useParams<{ chatId: string }>()
 
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [allContacts, setAllContacts] = useState<ContactModel[]>([]);
+  const [selectedChat, setSelectedChat] = useState<ChatResponseModel | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserModel | null>(null);
+  const [isFriendRequestsModalOpen, setIsFriendRequestsModalOpen] = useState(false);
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
+  const { chatId } = useParams<{ chatId: string }>();
+  const [incomingCall, setIncomingCall] = useState<{ Name: string; Avatar: string , OtherUserId : string } | null>(null);
+  const [callModalOpen,setCallModalOpen] = useState(false);
+  const [isCallRejected, setIsCallRejected] = useState(false)
+  // Check If the user is logged in
   useEffect(() => {
     const token = localStorage.getItem('jwtToken')
     if (!token) {
@@ -41,8 +46,8 @@ export default function HomePage() {
       })
       fetchUserData(decoded.id)
     }
-  }, [navigate])
-
+  }, [navigate]);
+  // when a chat is selected and the user relaods , it should open the same chat
   useEffect(() => {
     if (currentUser && allContacts.length > 0 && chatId) {
       const contact = allContacts.find(c => c.contactId === chatId)
@@ -50,97 +55,88 @@ export default function HomePage() {
         handleChatSelect(contact)
       }
     }
-  }, [currentUser, allContacts, chatId])
-  useEffect(() => {
-    const token = localStorage.getItem('jwtToken')
-    if (!token) {
-      navigate("/login")
-    } else {
-      const decoded = jwtDecode<DecodedToken>(token)
-      setCurrentUser({
-        id: decoded.id,
-        name: decoded.fullName,
-        isOnline: true,
-        lastSeen: new Date().toISOString()
-      })
-      fetchUserData(decoded.id)
-    }
-  }, [navigate])
+  }, [currentUser, allContacts, chatId]);
 
-  useEffect(() => {
-    if (currentUser?.id) {
-      setIsLoading(false)
-    }
-  }, [currentUser])
-  // Only initialize WebSocket once currentUser is set
+  // Initialiye WebSocket Connection and Only when currentUser is set
   useEffect(() => {
     if (currentUser) {
-      const initializeWebSocket = (userId: string) => {
-        const newSocket = new WebSocket(`wss://localhost:7032/ws?userId=${userId}`)
-        console.log("Web socket connection established")
-        setSocket(newSocket)
-
-        newSocket.onmessage = (event) => {
-          const payload = JSON.parse(event.data)
-          console.log("Message received from websocket: ", payload)
-
-          // Only process the message if currentUser is available
-          if (!currentUser) {
-            console.log("currentUser is not set yet")
-            return
-          }
-
-          if (payload.type === "message") {
-            const messageData: MessageModel = payload.data
-            updateChatAndContacts(messageData)
-          } else if (payload.type === "thumbnaillist") {
-            console.log("In thumbnail list")
-            if (currentUser.id) {
-              console.log("user id exists, about to call fetchData")
-              fetchUserData(currentUser.id)
-            }
-          }
-        }
-
-        newSocket.onclose = () => {
-          console.log("WebSocket connection closed")
-          setTimeout(() => initializeWebSocket(userId), 5000)
-        }
-
-        return () => {
-          if (newSocket.readyState === WebSocket.OPEN) {
-            newSocket.close()
-          }
-        }
-      }
+      setIsLoading(false);
       initializeWebSocket(currentUser.id)
     }
-  }, [currentUser])
+  }, [currentUser]);
+  useEffect(()=>{
+   console.log("Call modal open : ",callModalOpen);
+  },[callModalOpen])
+  // Initiate the socket connection by sending userId as the parameter
+  const initializeWebSocket = (userId: string) => {
+        
+    const newSocket = new WebSocket(`wss://localhost:7032/ws?userId=${userId}`)
 
-  const updateContacts = (newContactsData: ContactModel | ContactModel[]) => {
-    setAllContacts((prevContacts) => {
-      const updatedContacts = [...prevContacts]
-      const newContactsArray = Array.isArray(newContactsData) ? newContactsData : [newContactsData]
+    console.log("Web socket connection established")
+    
+    setSocket(newSocket)
 
-      newContactsArray.forEach(newContact => {
-        const existingIndex = updatedContacts.findIndex(c => c.contactId === newContact.contactId)
-        if (existingIndex !== -1) {
-          updatedContacts[existingIndex] = {
-            ...updatedContacts[existingIndex],
-            ...newContact,
-            lastMessage: newContact.lastMessage || updatedContacts[existingIndex].lastMessage
-          }
-        } else {
-          updatedContacts.push(newContact)
+    // This is where the message from the server is received
+    newSocket.onmessage = (event) => {
+        const payload = JSON.parse(event.data)
+        console.log("Message received from websocket: ", payload)
+
+        if (!currentUser) {
+          console.log("currentUser is not set yet")
+          return
         }
-      })
+            // This means the other user sent a message and is received here in real time
+        if (payload.type === "message") {
+          const messageData: MessageModel = payload.data
+          updateChatAndContacts(messageData)
+        } 
+           // This means the other user sent a message for the first time so we re-render the contact list essentially showing the message
+        else if (payload.type === "thumbnaillist") {
+          if (currentUser.id) {
+            console.log("user id exists, about to call fetchData")
+            fetchUserData(currentUser.id)
+          }
+        }
+           // This means the other user sent a call request so we show the incoming call modal
+        else if (payload.type === "call") {
+          // Handle incoming call
+          setIncomingCall(payload.data)
+        }
+        else if (payload.type === "endcall") {
+          console.log("Call rejected by user")
+          setIsCallRejected(true)
+          setTimeout(() => {
+            setCallModalOpen(false)
+            setIsCallRejected(false)
+          }, 2000)
+         
+        }
+    }
+    // When the socket connection is closed , keep trying to reconnect after a small delay
+    newSocket.onclose = () => {
+      console.log("WebSocket connection closed")
+      setTimeout(() => initializeWebSocket(userId), 5000)
+    }
 
-      return updatedContacts.sort((a, b) =>
-        new Date(b.lastMessage?.sentTime || 0).getTime() - new Date(a.lastMessage?.sentTime || 0).getTime()
-      )
-    })
+    return () => {
+      if (newSocket.readyState === WebSocket.OPEN) {
+        newSocket.close()
+      }
+    }
+  }
+  // Call accepted
+  const handleAcceptCall = () => {
+    console.log("Call accepted")
+    setIncomingCall(null)
+    setCallModalOpen(true)
   }
 
+  const handleDeclineCall = () => {
+    console.log("Call declined")
+    rejectCall()
+    setIncomingCall(null)
+  }
+  // When this user sends a message , update that message locally in the local message and thumbnail states
   const updateChatAndContacts = (newMessage: MessageModel) => {
     setSelectedChat((prevChat) => {
       if (prevChat && (prevChat.participants[0].id === newMessage.senderUserId || prevChat.participants[1].id === newMessage.senderUserId)) {
@@ -163,53 +159,12 @@ export default function HomePage() {
         }
         return contact
       })
-
-      // Check if the sender is not in the contact list
-      const senderInContacts = updatedContacts.some(contact => contact.contactId === newMessage.senderUserId)
-      if (!senderInContacts && newMessage.senderUserId !== currentUser?.id) {
-        fetchUserInfo(newMessage.senderUserId).then(userInfo => {
-          if (userInfo) {
-            updateContacts({
-              contactId: userInfo.id,
-              contactName: userInfo.name,
-              contactEmail: "", // We don't have this in the simplified UserModel
-              contactPicture: "", // We don't have this in the simplified UserModel
-              lastMessage: newMessage,
-              lastMessageTime: new Date(newMessage.sentTime),
-              readTime: null,
-              status: userInfo.isOnline ? "online" : "offline"
-            })
-          }
-        })
-      }
-
       return updatedContacts.sort(
         (a, b) => new Date(b.lastMessage?.sentTime || 0).getTime() - new Date(a.lastMessage?.sentTime || 0).getTime()
       )
     })
   }
-
-  const fetchUserInfo = async (userId: string): Promise<UserModel | null> => {
-    try {
-      const response = await fetch('https://localhost:7032/GetUserInfo', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ Id: userId }),
-      })
-      const data = await response.json()
-      if (data.success) {
-        console.log("User info from server : ", data)
-        return data.result
-      }
-      return null
-    } catch (error) {
-      console.error('Error fetching user info:', error)
-      return null
-    }
-  }
-
+  // Fetched the current user's contacts and their last messages , basically the thumbnails for all user chats
   const fetchUserData = async (userId: string) => {
     try {
       console.log("in fetch data with userId >", userId)
@@ -219,23 +174,22 @@ export default function HomePage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ Id: userId }),
-      })
-      const result: ApiResponse<ContactModel[]> = await res.json()
+      });
+      const result: ApiResponse<ContactModel[]> = await res.json();
       if (result.success) {
         setAllContacts(result.result.sort((a, b) =>
           new Date(b.lastMessage?.sentTime || 0).getTime() - new Date(a.lastMessage?.sentTime || 0).getTime()
         ))
       } else {
-        console.log("Result not success:", result.message)
+        console.log("Result not success:", result.message);
       }
     } catch (error) {
-      console.error('Error fetching user data:', error)
+      console.error('Error fetching user data:', error);
     }
   }
-
+  // This triggers when the user clicks on one of the chat thumbnails, so we actually fetch that chat 
   const handleChatSelect = async (contact: ContactModel) => {
     if (!currentUser) return
-
     try {
       const res = await fetch('https://localhost:7032/GetChatMessages', {
         method: 'POST',
@@ -258,15 +212,30 @@ export default function HomePage() {
       console.error('Error fetching chat messages:', error)
     }
   }
-
+  // Update message locally
   const handleSendMessage = async (message: MessageModel) => {
     if (selectedChat) {
       updateChatAndContacts(message)
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify(message))
-      }
+     // if (socket && socket.readyState === WebSocket.OPEN) {
+       // socket.send(JSON.stringify(message))
+     // }
     }
   }
+  const rejectCall = async () =>{
+    try{
+      const res = await fetch('https://localhost:7032/EndCall', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ SenderUserId: currentUser?.id , RecieverUserId : incomingCall?.OtherUserId}),
+      });
+
+    }catch(error){
+      console.log("An error occured rejecting the call : ",error);
+    }
+  }
+  // Logout
   const handleLogout = () => {
     localStorage.removeItem('jwtToken')
     navigate('/login')
@@ -314,6 +283,8 @@ export default function HomePage() {
           selectedChat={selectedChat} 
           currentUser={currentUser} 
           onSendMessage={handleSendMessage}
+          callModalOpen={callModalOpen}
+          isCallRejected={isCallRejected}
         />
       </div>
 
@@ -327,6 +298,14 @@ export default function HomePage() {
         onClose={() => setIsFriendRequestsModalOpen(false)}
         currentUser={currentUser}
       />
+     <IncomingCallModal
+        isOpen={!!incomingCall}
+        onAccept={handleAcceptCall}
+        onDecline={handleDeclineCall}
+        name={incomingCall?.Name || ''}
+        avatar={incomingCall?.Avatar || ''}
+      />
     </div>
+  
   )
 }
