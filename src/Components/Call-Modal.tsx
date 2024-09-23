@@ -1,59 +1,34 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Phone, X } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from './UI/avatar'
 import { Button } from './UI/button'
-import { ParticipantsModel } from '../Interfaces/Participants'
 
 interface CallModalProps {
   isOpen: boolean
   onClose: () => void
   name: string
   avatar: string
-  status: string
-  participants: ParticipantsModel | undefined
-  isCallRejected: boolean
+  status: 'idle' | 'ringing' | 'ongoing' | 'ended' | 'calling'
 }
 
-export function CallModal({ isOpen, onClose, name, avatar, status, participants, isCallRejected }: CallModalProps) {
-  const [callStatus, setCallStatus] = useState('Calling...')
-  const [shouldClose, setShouldClose] = useState(false)
-
-  useEffect(() => {
-    let timer: NodeJS.Timeout
-
-    if (isOpen) {
-      if (isCallRejected) {
-        setCallStatus('Call declined')
-        timer = setTimeout(() => {
-          setShouldClose(true)
-        }, 2000)
-        return;
-      } else if (status === "Online") {
-        timer = setTimeout(() => {
-          setCallStatus('Ringing')
-        }, 1000)
-      }
-    } else {
-      setCallStatus('Calling...')
-      setShouldClose(false)
-    }
-
-    return () => {
-      if (timer) clearTimeout(timer)
-    }
-  }, [isOpen, status, isCallRejected])
-
-  useEffect(() => {
-    if (shouldClose) {
-      onClose()
-      setShouldClose(false)
-    }
-  }, [shouldClose, onClose])
-
+export function CallModal({ isOpen, onClose, name, avatar, status }: CallModalProps) {
   if (!isOpen) return null
+
+  const getCallStatusText = () => {
+    switch (status) {
+      case 'ringing':
+        return 'Ringing...'
+      case 'ongoing':
+        return 'Call in progress'
+      case 'ended':
+        return 'Call ended'
+      default:
+        return 'Calling...'
+    }
+  }
 
   return (
     <AnimatePresence>
@@ -77,9 +52,9 @@ export function CallModal({ isOpen, onClose, name, avatar, status, participants,
               <AvatarFallback>{name.charAt(0)}</AvatarFallback>
             </Avatar>
             <h2 className="text-3xl font-bold text-white mb-2">{name}</h2>
-            <p className="text-xl text-indigo-100 mb-8">{callStatus}</p>
+            <p className="text-xl text-indigo-100 mb-8">{getCallStatusText()}</p>
             <div className="flex justify-center space-x-4">
-              {!isCallRejected && (
+              {status !== 'ended' && (
                 <Button
                   size="lg"
                   variant="destructive"
@@ -92,7 +67,7 @@ export function CallModal({ isOpen, onClose, name, avatar, status, participants,
               )}
             </div>
           </div>
-          {!isCallRejected && (
+          {status === 'ongoing' && (
             <div className="bg-indigo-900 bg-opacity-50 p-4">
               <div className="flex justify-between items-center text-indigo-100">
                 <span>Call duration: 00:00</span>

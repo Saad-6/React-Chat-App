@@ -11,11 +11,26 @@ interface MainChatAreaProps {
   selectedChat: ChatResponseModel | null
   currentUser: UserModel | null
   onSendMessage: (message: MessageModel) => void
-  callModalOpen: boolean
-  isCallRejected: boolean
+  callState: {
+    isIncomingCall: boolean
+    isOutgoingCall: boolean
+    callStatus: 'idle' | 'ringing' | 'ongoing' | 'ended' | 'calling'
+    callerName: string
+    callerAvatar: string
+    callerId: string
+  }
+  initiateCall: (recipientId: string, senderUserId:string, recipientName: string, recipientAvatar: string) => void
+  endCall: () => void
 }
 
-export function MainChatArea({ selectedChat, currentUser, onSendMessage, callModalOpen, isCallRejected }: MainChatAreaProps) {
+export function MainChatArea({ 
+  selectedChat, 
+  currentUser, 
+  onSendMessage, 
+  callState,
+  initiateCall,
+  endCall
+}: MainChatAreaProps) {
   const [localMessages, setLocalMessages] = useState<MessageModel[]>([])
   const [otherUserOnlineStatus, setOtherUserOnlineStatus] = useState(false)
   const [bothUsers, setBothUsers] = useState<ParticipantsModel>()
@@ -117,8 +132,7 @@ export function MainChatArea({ selectedChat, currentUser, onSendMessage, callMod
         avatar="/placeholder.svg?height=40&width=40" 
         participants={bothUsers}
         currentUserId={currentUser.id}
-        callModalOpen={callModalOpen}
-        isCallRejected={isCallRejected}
+        initiateCall={initiateCall}
       />
       <ChatMessages messages={localMessages} currentUserId={currentUser.id} />
       <ChatInput onSendMessage={handleSendMessage} />

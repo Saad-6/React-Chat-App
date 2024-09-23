@@ -10,6 +10,8 @@ import { Button } from '../Components/UI/button'
 import { Avatar, AvatarFallback, AvatarImage } from '../Components/UI/avatar'
 import { MainChatArea } from '../Components/Main-Chat'
 import { IncomingCallModal } from '../Components/Incoming-call-modal'
+import { useCallHandling } from '../hooks/useCallHandling'
+import { CallModal } from '../Components/Call-Modal'
 
 interface DecodedToken {
   id: string;
@@ -31,6 +33,21 @@ export default function HomePage() {
   const [incomingCall, setIncomingCall] = useState<{ Name: string; Avatar: string , OtherUserId : string } | null>(null);
   const [callModalOpen,setCallModalOpen] = useState(false);
   const [isCallRejected, setIsCallRejected] = useState(false)
+  const { 
+    callState, 
+    initiateCall, 
+    handleIncomingCall, 
+    acceptCall, 
+    endCall 
+  } = useCallHandling()
+  useEffect(()=>{
+    if(incomingCall){
+      console.log("Handling incoming call 2");
+
+      handleIncomingCall(incomingCall?.Name,incomingCall?.Avatar,incomingCall?.OtherUserId);
+    }
+
+  },[incomingCall])
   // Check If the user is logged in
   useEffect(() => {
     const token = localStorage.getItem('jwtToken')
@@ -100,15 +117,13 @@ export default function HomePage() {
            // This means the other user sent a call request so we show the incoming call modal
         else if (payload.type === "call") {
           // Handle incoming call
+          console.log("Handling incoming call 1");
           setIncomingCall(payload.data)
+         
         }
         else if (payload.type === "endcall") {
           console.log("Call rejected by user")
-          setIsCallRejected(true)
-          setTimeout(() => {
-            setCallModalOpen(false)
-            setIsCallRejected(false)
-          }, 2000)
+          endCall()
          
         }
     }
@@ -283,8 +298,9 @@ export default function HomePage() {
           selectedChat={selectedChat} 
           currentUser={currentUser} 
           onSendMessage={handleSendMessage}
-          callModalOpen={callModalOpen}
-          isCallRejected={isCallRejected}
+          callState={callState}
+          initiateCall={initiateCall}
+          endCall={endCall}
         />
       </div>
 
@@ -298,12 +314,19 @@ export default function HomePage() {
         onClose={() => setIsFriendRequestsModalOpen(false)}
         currentUser={currentUser}
       />
-     <IncomingCallModal
-        isOpen={!!incomingCall}
-        onAccept={handleAcceptCall}
-        onDecline={handleDeclineCall}
-        name={incomingCall?.Name || ''}
-        avatar={incomingCall?.Avatar || ''}
+  <IncomingCallModal
+        isOpen={callState.isIncomingCall}
+        onAccept={acceptCall}
+        onDecline={endCall}
+        name={callState.callerName}
+        avatar={callState.callerAvatar}
+      />
+      <CallModal
+        isOpen={callState.isOutgoingCall || (callState.isIncomingCall && callState.callStatus === 'ongoing')}
+        onClose={endCall}
+        name={callState.callerName}
+        avatar={callState.callerAvatar}
+        status={callState.callStatus}
       />
     </div>
   
